@@ -1,153 +1,95 @@
-const express = require('express');
-const http = require('http');
-const socketIO = require('socket.io');
-
+const express = require("express");
 const app = express();
-const server = http.Server(app);
-const io = socketIO(server);
+const server = require("http").Server(app);
+const io = require("socket.io")(server);
 
-// EJS + statické súbory
-app.set('view engine', 'ejs');
-app.set('views', 'views');
-app.use(express.static('public'));
+app.set("view engine", "ejs");
+app.use(express.static("public"));
 
-// Stav obrazoviek (1 účastník na obrazovku)
+// jedna spoločná miestnosť pre všetkých
+const ROOM_ID = "konferencia-room";
+
+// stav 4 obrazoviek v miestnosti
+// occupied = true => je tam pripojený hosť
 const screens = {
-  screen1: { occupant: null },
-  screen2: { occupant: null },
-  screen3: { occupant: null },
-  screen4: { occupant: null }, // prezentácia / share
+  1: { occupied: false },
+  2: { occupied: false },
+  3: { occupied: false },
+  4: { occupied: false }, // neskôr na zdieľanie obrazovky
 };
 
-function publicScreensState() {
-  const result = {};
-  for (const [id, data] of Object.entries(screens)) {
-    result[id] = {
-      occupied: !!data.occupant,
-      name: data.occupant ? data.occupant.name : null,
-    };
-  }
-  return result;
-}
+// socket.id -> info o užívateľovi
+// { role: 'guest' | 'screen', peerId: string, screenId: number | null }
+const socketToUser = new Map();
 
-// ---------- ROUTES ----------
-
-// Mapa miestnosti
-app.get('/', (req, res) => {
-  res.render('map'); // views/map.ejs
+// ÚVODNÁ STRÁNKA – mapa miestnosti
+app.get("/", (req, res) => {
+  res.render("index", { screens });
 });
 
-// Obrazovky v miestnosti (PC1–PC4)
-app.get('/screen/:id', (req, res) => {
-  const screenId = req.params.id;
+// PRIPOJENIE HOSŤA NA OBRAZOVKU
+app.get("/join/:screenParam", (req, res) => {
+  const screenId = parseScreenId(req.params.screenParam);
   if (!screens[screenId]) {
-    return res.status(404).send('Neznáma obrazovka');
+    return res.redirect("/");
   }
-  res.render('screen', { screenId }); // views/screen.ejs
+  res.render("guest", { roomId: ROOM_ID, screenId });
 });
 
-// (voliteľné) klasická room, ak ju chceš použiť na ďalší call
-app.get('/room/:room', (req, res) => {
-  res.render('room', { roomId: req.params.room });
+// OBRAZOVKA V MIESTNOSTI (PC1–PC4)
+app.get("/screen/:screenParam", (req, res) => {
+  const screenId = parseScreenId(req.params.screenParam);
+  if (!screens[screenId]) {
+    return res.redirect("/");
+  }
+  res.render("screen", { roomId: ROOM_ID, screenId });
 });
 
-// ---------- SOCKET.IO LOGIKA ----------
+// fallback – ak by si mal niekde starý link typu /:room
+app.get("/:room", (req, res) => {
+  res.render("guest", { roomId: req.params.room, screenId: null });
+});
 
-io.on('connection', (socket) => {
-  console.log('Nové pripojenie:', socket.id);
+// SOCKET.IO – signalizácia pre WebRTC + stav obrazoviek
+io.on("connection", (socket) => {
+  socket.on("join-room", (roomId, peerId, meta = {}) => {
+    const role = meta.role || "guest";
+    const screenId = meta.screenId || null;
 
-  // predvolený stav
-  socket.screenId = null; // pre remote účastníka: na ktorú obrazovku je priradený
-  socket.isScreen = false; // true = tento socket je fyzická obrazovka /screen/:id
+    socketToUser.set(socket.id, { role, peerId, screenId });
 
-  // po pripojení pošleme aktuálny stav
-  socket.emit('screens-state', publicScreensState());
-
-  // ----- registrácia obrazovky (/screen/:id) -----
-  socket.on('register-screen', ({ screenId }) => {
-    if (!screens[screenId]) return;
-    socket.isScreen = true;
-    socket.screenId = screenId;
-    console.log(`Socket ${socket.id} registrovaný ako obrazovka ${screenId}`);
-  });
-
-  // ----- žiadosť remote účastníka obsadiť obrazovku -----
-  socket.on('request-screen', ({ screenId, name }) => {
-    const screen = screens[screenId];
-
-    if (!screen) {
-      socket.emit('screen-error', { message: 'Neznáma obrazovka.' });
-      return;
+    // ak je to hosť a pripája sa na konkrétnu obrazovku, označ ju ako obsadenú
+    if (role === "guest" && screenId && screens[screenId]) {
+      screens[screenId].occupied = true;
+      io.emit("screens-update", screens);
     }
 
-    if (screen.occupant) {
-      socket.emit('screen-busy', { screenId });
-      return;
-    }
-
-    // priradíme účastníka k obrazovke
-    screen.occupant = {
-      socketId: socket.id,
-      name: name || 'Účastník',
-    };
-
-    socket.screenId = screenId; // tento socket reprezentuje účastníka
-    socket.isScreen = false;
-
-    io.emit('screens-state', publicScreensState());
-    socket.emit('screen-assigned', { screenId });
-  });
-
-  // ----- účastník sa dobrovoľne odhlasuje -----
-  socket.on('leave-screen', () => {
-    if (!socket.screenId || socket.isScreen) return; // obrazovka sa takto neodhlasuje
-    const screenId = socket.screenId;
-    const screen = screens[screenId];
-
-    if (screen && screen.occupant && screen.occupant.socketId === socket.id) {
-      screen.occupant = null;
-      socket.screenId = null;
-      io.emit('screens-state', publicScreensState());
-    }
-  });
-
-  // ----- disconnect -----
-  socket.on('disconnect', () => {
-    // 1) remote účastník -> uvoľni jeho obrazovku
-    if (!socket.isScreen && socket.screenId) {
-      const screenId = socket.screenId;
-      const screen = screens[screenId];
-      if (screen && screen.occupant && screen.occupant.socketId === socket.id) {
-        screen.occupant = null;
-        console.log(`Účastník na ${screenId} sa odpojil (socket ${socket.id})`);
-        io.emit('screens-state', publicScreensState());
-      }
-    }
-
-    // 2) fyzická obrazovka -> uvoľni obrazovku, ak bola obsadená
-    if (socket.isScreen && socket.screenId) {
-      const screenId = socket.screenId;
-      const screen = screens[screenId];
-      if (screen && screen.occupant) {
-        console.log(`Obrazovka ${screenId} spadla, uvoľňujem ju.`);
-        screen.occupant = null;
-        io.emit('screens-state', publicScreensState());
-      }
-    }
-  });
-
-  // ----- pôvodná zoom-clone logika (ak chceš /room/:room) -----
-  socket.on('join-room', (roomId, userId) => {
     socket.join(roomId);
-    socket.to(roomId).broadcast.emit('user-connected', userId);
 
-    socket.on('disconnect', () => {
-      socket.to(roomId).broadcast.emit('user-disconnected', userId);
+    // ostatným v miestnosti oznámime, že sa pripojil nový peer
+    socket.to(roomId).emit("user-connected", peerId);
+
+    socket.on("disconnect", () => {
+      const info = socketToUser.get(socket.id);
+      if (!info) return;
+
+      if (info.role === "guest" && info.screenId && screens[info.screenId]) {
+        screens[info.screenId].occupied = false;
+        io.emit("screens-update", screens);
+      }
+
+      socket.to(roomId).emit("user-disconnected", info.peerId);
+      socketToUser.delete(socket.id);
     });
   });
 });
 
-// ---------- START SERVERA ----------
+// pomocná funkcia – podporí /screen2 aj /2
+function parseScreenId(param) {
+  const match = String(param).match(/(\d+)/);
+  if (!match) return null;
+  return parseInt(match[1], 10);
+}
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+  <meta charset="UTF-8">
+  <title>Konferenčná miestnosť</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <h1>Konferenčná miestnosť</h1>
+
+  <div id="screens" class="screen-grid">
+    <% [1,2,3,4].forEach(function(id){ %>
+      <div class="screen-card <%= screens[id].occupied ? 'occupied' : '' %>" data-screen-id="<%= id %>">
+        <h2>Obrazovka <%= id %></h2>
+        <p class="state">
+          <%= screens[id].occupied ? 'Obsadená' : 'Voľná' %>
+        </p>
+        <a href="/join/<%= id %>" class="btn">Pripojiť sa ako hosť</a>
+        <p class="hint">
+          (obrazovka v miestnosti: /screen/<%= id %>)
+        </p>
+      </div>
+    <% }) %>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io("/");
+
+    socket.on("screens-update", (screens) => {
+      Object.keys(screens).forEach((id) => {
+        const card = document.querySelector(`.screen-card[data-screen-id="${id}"]`);
+        if (!card) return;
+        const stateEl = card.querySelector(".state");
+        const occupied = screens[id].occupied;
+        stateEl.textContent = occupied ? "Obsadená" : "Voľná";
+        card.classList.toggle("occupied", occupied);
+      });
+    });
+  </script>
+</body>
+</html>

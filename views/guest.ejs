@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+  <meta charset="UTF-8">
+  <title>Hosť – konferencia</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header>
+    <h1>Hosť – konferencia</h1>
+    <% if (screenId) { %>
+      <p>Pripojený na obrazovku <strong><%= screenId %></strong></p>
+    <% } else { %>
+      <p>Pripojený do miestnosti bez priradenej obrazovky</p>
+    <% } %>
+  </header>
+
+  <main>
+    <div id="video-grid" class="video-grid"></div>
+  </main>
+
+  <!-- Socket.IO -->
+  <script src="/socket.io/socket.io.js"></script>
+  <!-- PeerJS z lokálneho súboru -->
+  <script src="/vendor/peerjs.min.js"></script>
+
+  <script>
+    const ROOM_ID = "<%= roomId %>";
+    const SCREEN_ID = <%= screenId ? screenId : "null" %>;
+  </script>
+
+  <!-- náš klientsky kód -->
+  <script src="/guest.js"></script>
+</body>
+</html>
