@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+  <meta charset="UTF-8" />
+  <title><%= screenId %> - miestnosť</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background: black;
+      color: white;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    header {
+      padding: 8px 16px;
+      background: #111827;
+      font-size: 14px;
+    }
+
+    #status {
+      color: #9ca3af;
+    }
+
+    #top-bar {
+      flex: 0 0 auto;
+    }
+
+    #video-area {
+      flex: 1 1 auto;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+      overflow: hidden;
+      background: black;
+      min-height: calc(100vh - 200px);
+    }
+
+    /* --- ZMENŠENÁ KAMERA --- */
+    #remoteVideo {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background-color: black;
+
+      max-width: 100%;     /* 👈 kamera menšia */
+      max-height: 10%;    /* 👈 kamera menšia */
+    }
+
+    #placeholder {
+      position: absolute;
+      font-size: 32px;
+      color: white;
+      text-shadow: 0 0 8px black;
+      text-align: center;
+    }
+
+    video {
+      max-width: 100%;
+      max-height: 100%;
+    }
+
+    /* warning texty */
+    #warning-bar {
+      flex: 0 0 auto;
+      text-align: center;
+      padding: 4px 0;
+    }
+
+    .warning {
+      display: block;
+      font-size: 14px;
+      color: #ffd857;
+      text-shadow: 0 0 4px rgba(0,0,0,0.8);
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    /* spodný panel ovládania */
+    #control-bar {
+      flex: 0 0 auto;
+      text-align: center;
+      padding: 8px 0 16px;
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+    }
+
+    .control-btn {
+      padding: 12px 18px;
+      border: none;
+      border-radius: 8px;
+      background: #2f3338;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    .control-btn:hover {
+      background: #3f454c;
+    }
+
+    .control-btn.leave {
+      background: #b53030;
+    }
+
+    .control-btn.leave:hover {
+      background: #d64040;
+    }
+
+  </style>
+</head>
+<body>
+  <div id="top-bar">
+    <header>
+      <div><strong><%= screenId %></strong> – obrazovka v miestnosti</div>
+      <div id="status">Čakám na účastníka...</div>
+    </header>
+  </div>
+
+  <div id="video-area">
+    <span id="placeholder">Žiadny účastník nie je priradený.</span>
+    <video id="remoteVideo" autoplay playsinline></video>
+  </div>
+
+  <!-- Upozornenia -->
+  <div id="warning-bar">
+    <span id="mute-warning" class="warning hidden">
+      Upozornenie: zvuk je vypnutý, účastníka na tejto obrazovke nepočuť.
+    </span>
+    <span id="cam-warning" class="warning hidden">
+      Upozornenie: kamera (video) je vypnutá, zobrazuje sa len text.
+    </span>
+  </div>
+
+  <!-- Spodný panel ovládania -->
+  <div id="control-bar">
+    <button id="btn-mute" class="control-btn">🔊 Zvuk zapnutý</button>
+    <button id="btn-camera" class="control-btn">📷 Kamera zapnutá</button>
+    <button id="btn-leave" class="control-btn leave">❌ Odpojiť</button>
+  </div>
+
+  <script>
+    window.SCREEN_ID = "<%= screenId %>";
+  </script>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <script src="/js/screen.js"></script>
+</body>
+</html>
