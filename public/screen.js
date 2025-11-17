@@ -9,11 +9,21 @@ const myPeer = new Peer(undefined, {
 
 let currentVideo = null;
 
+myPeer.on("open", (id) => {
+  console.log("SCREEN PeerJS ID:", id);
+  socket.emit("join-room", ROOM_ID, id, {
+    role: "screen",
+    screenId: SCREEN_ID,
+  });
+});
+
 // obrazovka neposiela vlastné video, len prijíma cudzie streamy
 myPeer.on("call", (call) => {
-  call.answer(); // bez vlastného streamu
+  console.log("SCREEN: prichádzajúci hovor od", call.peer);
+  call.answer();
   const video = document.createElement("video");
   call.on("stream", (userVideoStream) => {
+    console.log("SCREEN: dostal stream, zobrazujem video");
     showSingleVideo(video, userVideoStream);
   });
   call.on("close", () => {
@@ -24,16 +34,9 @@ myPeer.on("call", (call) => {
   });
 });
 
-myPeer.on("open", (id) => {
-  // role = screen, priradená obrazovka = SCREEN_ID
-  socket.emit("join-room", ROOM_ID, id, {
-    role: "screen",
-    screenId: SCREEN_ID,
-  });
-});
-
 function showSingleVideo(video, stream) {
   video.srcObject = stream;
+  video.muted = true; // nech autoplay určite prebehne
   video.addEventListener("loadedmetadata", () => {
     video.play();
   });

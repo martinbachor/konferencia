@@ -10,7 +10,6 @@ app.use(express.static("public"));
 const ROOM_ID = "konferencia-room";
 
 // stav 4 obrazoviek v miestnosti
-// occupied = true => je tam pripojený hosť
 const screens = {
   1: { occupied: false },
   2: { occupied: false },
@@ -19,8 +18,11 @@ const screens = {
 };
 
 // socket.id -> info o užívateľovi
-// { role: 'guest' | 'screen', peerId: string, screenId: number | null }
+// { role: 'guest' | 'screen', peerId: string, screenId: number | null, roomId: string }
 const socketToUser = new Map();
+
+// roomId -> Set peerId-ov v miestnosti
+const roomPeers = new Map();
 
 // ÚVODNÁ STRÁNKA – mapa miestnosti
 app.get("/", (req, res) => {
@@ -45,40 +47,68 @@ app.get("/screen/:screenParam", (req, res) => {
   res.render("screen", { roomId: ROOM_ID, screenId });
 });
 
-// fallback – ak by si mal niekde starý link typu /:room
+// fallback – ak by si mal starý link typu /:room
 app.get("/:room", (req, res) => {
   res.render("guest", { roomId: req.params.room, screenId: null });
 });
 
 // SOCKET.IO – signalizácia pre WebRTC + stav obrazoviek
 io.on("connection", (socket) => {
+  console.log("Nové socket spojenie:", socket.id);
+
   socket.on("join-room", (roomId, peerId, meta = {}) => {
     const role = meta.role || "guest";
     const screenId = meta.screenId || null;
 
-    socketToUser.set(socket.id, { role, peerId, screenId });
+    console.log("join-room:", { roomId, peerId, role, screenId });
 
-    // ak je to hosť a pripája sa na konkrétnu obrazovku, označ ju ako obsadenú
+    const userInfo = { role, peerId, screenId, roomId };
+    socketToUser.set(socket.id, userInfo);
+
+    // hosť obsadzuje obrazovku
     if (role === "guest" && screenId && screens[screenId]) {
       screens[screenId].occupied = true;
       io.emit("screens-update", screens);
     }
 
-    socket.join(roomId);
+    // pošli novému klientovi ZOZNAM všetkých peerId, ktoré už sú v roome
+    for (const [, info] of socketToUser.entries()) {
+      if (info.roomId === roomId && info.peerId !== peerId) {
+        socket.emit("user-connected", info.peerId);
+      }
+    }
 
-    // ostatným v miestnosti oznámime, že sa pripojil nový peer
-    socket.to(roomId).emit("user-connected", peerId);
+    // pridaj peerId do roomPeers
+    if (!roomPeers.has(roomId)) {
+      roomPeers.set(roomId, new Set());
+    }
+    roomPeers.get(roomId).add(peerId);
+
+    socket.join(roomId);
 
     socket.on("disconnect", () => {
       const info = socketToUser.get(socket.id);
+      console.log("disconnect:", socket.id, info);
       if (!info) return;
 
+      // uvoľni obsadenú obrazovku hosťa
       if (info.role === "guest" && info.screenId && screens[info.screenId]) {
         screens[info.screenId].occupied = false;
         io.emit("screens-update", screens);
       }
 
-      socket.to(roomId).emit("user-disconnected", info.peerId);
+      // daj ostatným v roome vedieť, že peer zmizol
+      socket.to(info.roomId).emit("user-disconnected", info.peerId);
+
+      // odstráň z roomPeers
+      const peersInRoom = roomPeers.get(info.roomId);
+      if (peersInRoom) {
+        peersInRoom.delete(info.peerId);
+        if (peersInRoom.size === 0) {
+          roomPeers.delete(info.roomId);
+        }
+      }
+
       socketToUser.delete(socket.id);
     });
   });
