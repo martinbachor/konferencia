@@ -6,37 +6,61 @@
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <h1>Konferenčná miestnosť</h1>
+<h1>Konferenčná miestnosť</h1>
 
-  <div id="screens" class="screen-grid">
-    <% [1,2,3,4].forEach(function(id){ %>
-      <div class="screen-card <%= screens[id].occupied ? 'occupied' : '' %>" data-screen-id="<%= id %>">
+<div id="screens" class="screen-grid">
+  <% [1,2,3,4].forEach(function(id){ %>
+    <div class="screen-card <%= screens[id].occupied ? 'occupied' : '' %>" data-screen-id="<%= id %>">
+      <% if (id === 4) { %>
+        <h2>Obrazovka 4 – zdieľanie</h2>
+        <p class="state">
+          <%= screens[4].sharingActive ? 'Zdieľanie prebieha' : 'Zdieľanie voľné' %>
+        </p>
+        <p class="hint">
+          Túto obrazovku ovládajú hostia tlačidlom „Zdieľať obrazovku“.
+        </p>
+        <p class="hint">
+          Monitor: /screen/4
+        </p>
+      <% } else { %>
         <h2>Obrazovka <%= id %></h2>
         <p class="state">
           <%= screens[id].occupied ? 'Obsadená' : 'Voľná' %>
         </p>
-        <a href="/join/<%= id %>" class="btn">Pripojiť sa ako hosť</a>
+        <a href="/join/<%= id %>" class="btn">
+          Pripojiť sa ako hosť
+        </a>
         <p class="hint">
-          (obrazovka v miestnosti: /screen/<%= id %>)
+          Monitor: /screen/<%= id %>
         </p>
-      </div>
-    <% }) %>
-  </div>
+      <% } %>
+    </div>
+  <% }) %>
+</div>
 
-  <script src="/socket.io/socket.io.js"></script>
-  <script>
-    const socket = io("/");
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  const socket = io("/");
 
-    socket.on("screens-update", (screens) => {
-      Object.keys(screens).forEach((id) => {
-        const card = document.querySelector(`.screen-card[data-screen-id="${id}"]`);
-        if (!card) return;
-        const stateEl = card.querySelector(".state");
-        const occupied = screens[id].occupied;
-        stateEl.textContent = occupied ? "Obsadená" : "Voľná";
-        card.classList.toggle("occupied", occupied);
-      });
+  socket.on("screens-update", (screens) => {
+    Object.keys(screens).forEach((id) => {
+      const card = document.querySelector(`.screen-card[data-screen-id="${id}"]`);
+      if (!card) return;
+
+      const data = screens[id];
+      const stateEl = card.querySelector(".state");
+
+      if (parseInt(id, 10) === 4) {
+        // obrazovka 4 – zdieľanie
+        stateEl.textContent = data.sharingActive ? "Zdieľanie prebieha" : "Zdieľanie voľné";
+        card.classList.toggle("occupied", data.sharingActive);
+      } else {
+        // obrazovky 1–3
+        stateEl.textContent = data.occupied ? "Obsadená" : "Voľná";
+        card.classList.toggle("occupied", data.occupied);
+      }
     });
-  </script>
+  });
+</script>
 </body>
 </html>

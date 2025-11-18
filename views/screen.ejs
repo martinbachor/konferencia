@@ -18,7 +18,7 @@
 
   <script>
     const ROOM_ID = "<%= roomId %>";
-    const SCREEN_ID = <%= screenId %>;
+    const SCREEN_ID = <%- JSON.stringify(screenId) %>;
   </script>
 
   <script src="/screen.js"></script>

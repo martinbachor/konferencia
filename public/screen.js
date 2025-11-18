@@ -20,7 +20,7 @@ myPeer.on("open", (id) => {
 // obrazovka neposiela vlastné video, len prijíma cudzie streamy
 myPeer.on("call", (call) => {
   console.log("SCREEN: prichádzajúci hovor od", call.peer);
-  call.answer();
+  call.answer(); // bez vlastného streamu
   const video = document.createElement("video");
   call.on("stream", (userVideoStream) => {
     console.log("SCREEN: dostal stream, zobrazujem video");
@@ -36,7 +36,7 @@ myPeer.on("call", (call) => {
 
 function showSingleVideo(video, stream) {
   video.srcObject = stream;
-  video.muted = true; // nech autoplay určite prebehne
+  video.muted = true; // pre istotu kvôli autoplay
   video.addEventListener("loadedmetadata", () => {
     video.play();
   });

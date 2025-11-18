@@ -1,35 +1,46 @@
 <!DOCTYPE html>
 <html lang="sk">
 <head>
-  <meta charset="UTF-8">
-  <title>Hosť – konferencia</title>
-  <link rel="stylesheet" href="/style.css">
+    <meta charset="UTF-8" />
+    <title>Hosť – konferencia</title>
+    <link rel="stylesheet" href="/style.css" />
 </head>
+
 <body>
-  <header>
+<header class="guest-header">
     <h1>Hosť – konferencia</h1>
-    <% if (screenId) { %>
-      <p>Pripojený na obrazovku <strong><%= screenId %></strong></p>
+
+    <% if (typeof screenId === "number") { %>
+        <p>Pripojený na obrazovku <strong><%= screenId %></strong></p>
     <% } else { %>
-      <p>Pripojený do miestnosti bez priradenej obrazovky</p>
+        <p>Pripojený do miestnosti – bez priradenej obrazovky</p>
     <% } %>
-  </header>
 
-  <main>
+    <!-- 🔥 TLAČIDLO NA ZDIEĽANIE OBRAZOVKY -->
+    <button id="share-screen-btn" class="btn" style="margin-top: 1rem;">
+        Zdieľať obrazovku na obrazovku 4
+    </button>
+</header>
+
+<main>
+    <!-- kde sa zobrazujú videá -->
     <div id="video-grid" class="video-grid"></div>
-  </main>
+</main>
 
-  <!-- Socket.IO -->
-  <script src="/socket.io/socket.io.js"></script>
-  <!-- PeerJS z lokálneho súboru -->
-  <script src="/vendor/peerjs.min.js"></script>
+<!-- Socket.IO -->
+<script src="/socket.io/socket.io.js"></script>
 
-  <script>
+<!-- PeerJS lokálne -->
+<script src="/vendor/peerjs.min.js"></script>
+
+<!-- Konštanty z EJS -->
+<script>
     const ROOM_ID = "<%= roomId %>";
-    const SCREEN_ID = <%= screenId ? screenId : "null" %>;
-  </script>
+    const SCREEN_ID = <%= screenId !== undefined ? screenId : "null" %>;
+</script>
 
-  <!-- náš klientsky kód -->
-  <script src="/guest.js"></script>
+<!-- Klientsky JS -->
+<script src="/guest.js"></script>
+
 </body>
 </html>
